@@ -65,12 +65,12 @@ jobs:
         run: git clone --depth 1 --branch "$DDB_REF" https://github.com/DeaDBeeF-Player/deadbeef.git deadbeef-headers
 
       - name: Build
-        working-directory: deadbeef-plugin
+        working-directory: provider-deadbeef
         run: |
           make clean
           make DDB_HEADERS="$GITHUB_WORKSPACE/deadbeef-headers/include"
           test -f mmcp.so
 
       - name: End-to-end test
-        working-directory: deadbeef-plugin
+        working-directory: provider-deadbeef
         run: make test DDB_HEADERS="$GITHUB_WORKSPACE/deadbeef-headers/include"

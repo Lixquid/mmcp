@@ -18,8 +18,8 @@ cannot guarantee, so the art value in `TRACK` is always empty.
 
 Pre-built plugin packages are published on the **Releases** page of this
 GitHub repository (<https://github.com/<owner>/<repo>/releases>). Releases
-are created automatically whenever a `deadbeef/v*` tag is pushed (for
-example `deadbeef/v1.0.0` becomes release "v1.0.0").
+are created automatically whenever a `provider-deadbeef/v*` tag is pushed (for
+example `provider-deadbeef/v1.0.0` becomes release "v1.0.0").
 
 Each release ships one package per platform:
 
@@ -93,8 +93,8 @@ Prints `RESULT PASS` on success.
 
 ## Releases
 
-Pushing a tag `deadbeef/v*` (e.g. `deadbeef/v1.0.0`) runs the GitHub Actions
-workflow in `.github/workflows/release-deadbeef.yml`, which builds the plugin
+Pushing a tag `provider-deadbeef/v*` (e.g. `provider-deadbeef/v1.0.0`) runs the GitHub Actions
+workflow in `.github/workflows/release-provider-deadbeef.yml`, which builds the plugin
 for Linux x86-64 (`mmcp.so`) and Windows x86-64 (`mmcp.dll`) and attaches the
 packaged zips to a GitHub Release.
 

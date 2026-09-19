@@ -1,13 +1,13 @@
 name: Release DeaDBeeF plugin
 
-# Triggered by pushing a tag such as "deadbeef/v1.0.0".
-# Builds the MMCP provider plugin from deadbeef-plugin/ for the supported
+# Triggered by pushing a tag such as "provider-deadbeef/v1.0.0".
+# Builds the MMCP provider plugin from provider-deadbeef/ for the supported
 # platforms and attaches the packaged artifacts to a GitHub Release.
 
 on:
   push:
     tags:
-      - "deadbeef/v*"
+      - "provider-deadbeef/v*"
 
 permissions:
   contents: write
@@ -51,7 +51,7 @@ jobs:
         run: git clone --depth 1 --branch "$DDB_REF" "$DDB_REPO" deadbeef
 
       - name: Build
-        working-directory: deadbeef-plugin
+        working-directory: provider-deadbeef
         run: |
           make clean
           make \
@@ -62,11 +62,11 @@ jobs:
           test -f '${{ matrix.plugin }}'
 
       - name: Package
-        working-directory: deadbeef-plugin
+        working-directory: provider-deadbeef
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
-          VERSION="${GITHUB_REF_NAME#deadbeef/v}"
+          VERSION="${GITHUB_REF_NAME#provider-deadbeef/v}"
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp "${{ matrix.plugin }}" "$GITHUB_WORKSPACE/dist/"
           cp README.md LICENSE "$GITHUB_WORKSPACE/dist/"
