@@ -1,8 +1,40 @@
-# tui-controller
+# controller-tui
 
 A terminal controller for the [Multicast Media Control Protocol (MMCP)](../SPEC.md)
 written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea) and
 [Lip Gloss](https://github.com/charmbracelet/lipgloss).
+
+## Downloading a release
+
+Pre-built controller binaries are published on the **Releases** page of this
+GitHub repository (<https://github.com/<owner>/<repo>/releases>). Releases
+are created automatically whenever a `controller-tui/v*` tag is pushed (for
+example `controller-tui/v1.0.0` becomes release "v1.0.0").
+
+Each release ships one package per platform:
+
+| Asset                                                        | Contents                                                  |
+| ------------------------------------------------------------ | --------------------------------------------------------- |
+| `mmcp-controller-tui-<version>-linux-x86_64.tar.gz`          | `controller-tui` (Linux x86-64 static binary), README     |
+| `mmcp-controller-tui-<version>-windows-x86_64.zip`           | `controller-tui.exe` (Windows x86-64 binary), README      |
+
+The binaries are statically linked and need no runtime dependencies.
+
+### Installing on Linux
+
+1. Download the `linux-x86_64` tarball from the release you want.
+2. Extract and run:
+
+   ```sh
+   tar -xzf mmcp-controller-tui-<version>-linux-x86_64.tar.gz
+   ./controller-tui
+   ```
+
+### Installing on Windows
+
+1. Download the `windows-x86_64` zip from the release you want.
+2. Unpack it anywhere and run `controller-tui.exe` from a terminal
+   (it is a full-screen terminal application).
 
 ## Running
 

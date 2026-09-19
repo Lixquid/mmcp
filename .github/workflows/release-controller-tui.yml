@@ -1,0 +1,97 @@
+name: Release MMCP Controller TUI
+
+# Triggered by pushing a tag such as "controller-tui/v1.0.0".
+# Builds the terminal controller for the supported platforms and attaches
+# the packaged artifacts to a GitHub Release.
+
+on:
+  push:
+    tags:
+      - "controller-tui/v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            goos: linux
+            goarch: amd64
+            binary: controller-tui
+            archive: tar.gz
+            ext: ""
+          - platform: windows-x86_64
+            goos: windows
+            goarch: amd64
+            binary: controller-tui
+            archive: zip
+            ext: ".exe"
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: controller-tui/go.mod
+          cache-dependency-path: controller-tui/go.sum
+
+      - name: Build
+        working-directory: controller-tui
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          go build -trimpath -ldflags "-s -w" \
+            -o "$GITHUB_WORKSPACE/dist/${{ matrix.binary }}${{ matrix.ext }}" .
+
+      - name: Package
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#controller-tui/v}"
+          ARCHIVE="$GITHUB_WORKSPACE/mmcp-controller-tui-${VERSION}-${PLATFORM}.${{ matrix.archive }}"
+          cp README.md "$GITHUB_WORKSPACE/dist/"
+          if [ "${{ matrix.archive }}" = "tar.gz" ]; then
+            tar -czf "$ARCHIVE" -C "$GITHUB_WORKSPACE/dist" \
+              "${{ matrix.binary }}${{ matrix.ext }}" README.md
+          else
+            (cd "$GITHUB_WORKSPACE/dist" && python3 -m zipfile -c "$ARCHIVE" \
+              "${{ matrix.binary }}${{ matrix.ext }}" README.md)
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmcp-controller-tui-${{ matrix.platform }}
+          path: mmcp-controller-tui-*.${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach artifacts to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
