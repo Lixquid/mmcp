@@ -1,0 +1,15 @@
+{
+    supported_platforms: ['linux', 'mac', 'windows'],
+    source: {
+        type: "git",
+        url: "https://github.com/mmcp/deadbeef-plugin.git",
+    },
+    make: {
+        type: "make",
+        ENV: {},
+        root: "/",
+        out: [
+            "mmcp.so"
+        ]
+    }
+}
