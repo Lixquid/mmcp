@@ -1,0 +1,110 @@
+name: Release MMCP Hub
+
+# Triggered by pushing a tag such as "hub/v1.0.0".
+# Builds the MMCP Hub (Fyne GUI application) for the supported platforms
+# and attaches the packaged artifacts to a GitHub Release.
+
+on:
+  push:
+    tags:
+      - "hub/v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            goos: linux
+            goarch: amd64
+            cc: ""
+            binary: hub
+            archive: tar.gz
+            ldflags: "-s -w"
+          - platform: windows-x86_64
+            goos: windows
+            goarch: amd64
+            cc: x86_64-w64-mingw32-gcc
+            binary: hub.exe
+            archive: zip
+            ldflags: "-H=windowsgui -s -w"
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: hub/go.mod
+          cache-dependency-path: hub/go.sum
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev xorg-dev
+          if [ "${{ matrix.platform }}" = "windows-x86_64" ]; then
+            sudo apt-get install -y gcc-mingw-w64-x86-64
+          fi
+
+      - name: Build
+        working-directory: hub
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+        run: |
+          if [ -z "$CC" ]; then unset CC; fi
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          go build -trimpath -ldflags "${{ matrix.ldflags }}" \
+            -o "$GITHUB_WORKSPACE/dist/${{ matrix.binary }}" .
+
+      - name: Package
+        working-directory: hub
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#hub/v}"
+          ARCHIVE="mmcp-hub-${VERSION}-${PLATFORM}.${{ matrix.archive }}"
+          cp README.md "$GITHUB_WORKSPACE/dist/"
+          if [ "${{ matrix.archive }}" = "tar.gz" ]; then
+            tar -czf "$ARCHIVE" -C "$GITHUB_WORKSPACE/dist" \
+              "${{ matrix.binary }}" README.md
+          else
+            (cd "$GITHUB_WORKSPACE/dist" && python3 -m zipfile -c "../$ARCHIVE" \
+              "${{ matrix.binary }}" README.md)
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmcp-hub-${{ matrix.platform }}
+          path: mmcp-hub-*.${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach artifacts to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
