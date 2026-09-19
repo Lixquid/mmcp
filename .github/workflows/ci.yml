@@ -62,8 +62,7 @@ jobs:
           cache-dependency-path: hub/go.sum
 
       - name: Fetch DeaDBeeF headers
-        run: git clone --depth 1 --branch "$DDB_REF" \
-          https://github.com/DeaDBeeF-Player/deadbeef.git deadbeef-headers
+        run: git clone --depth 1 --branch "$DDB_REF" https://github.com/DeaDBeeF-Player/deadbeef.git deadbeef-headers
 
       - name: Build
         working-directory: deadbeef-plugin
