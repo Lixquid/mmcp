@@ -1,0 +1,77 @@
+name: CI
+
+# Build and test the MMCP Hub and the DeaDBeeF provider plugin on every
+# commit and pull request.
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hub:
+    name: Hub (build & test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: hub/go.mod
+          cache-dependency-path: hub/go.sum
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev xorg-dev
+
+      - name: Build
+        working-directory: hub
+        run: |
+          go build ./...
+          go build -trimpath -ldflags "-s -w" -o hub .
+
+      - name: Vet
+        working-directory: hub
+        run: go vet ./...
+
+      - name: Test
+        working-directory: hub
+        run: go test ./... -v
+
+  deadbeef:
+    name: Deadbeef plugin (build & e2e test)
+    runs-on: ubuntu-latest
+    env:
+      # Build and test against the same released API version as the
+      # release workflow pins.
+      DDB_REF: "1.10.3"
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: hub/go.mod
+          cache-dependency-path: hub/go.sum
+
+      - name: Fetch DeaDBeeF headers
+        run: git clone --depth 1 --branch "$DDB_REF" \
+          https://github.com/DeaDBeeF-Player/deadbeef.git deadbeef-headers
+
+      - name: Build
+        working-directory: deadbeef-plugin
+        run: |
+          make clean
+          make DDB_HEADERS="$GITHUB_WORKSPACE/deadbeef-headers/include"
+          test -f mmcp.so
+
+      - name: End-to-end test
+        working-directory: deadbeef-plugin
+        run: make test DDB_HEADERS="$GITHUB_WORKSPACE/deadbeef-headers/include"
