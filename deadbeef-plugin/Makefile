@@ -12,6 +12,12 @@
 CC ?= cc
 PLUGIN := mmcp.so
 
+# DDB_HEADERS (source-tree include dir with a deadbeef/ subdirectory) can be
+# given instead of DDB_INCLUDE; -I is added automatically for it.
+ifneq ($(strip $(DDB_HEADERS)),)
+DDB_INCLUDE ?= -I$(DDB_HEADERS)
+endif
+
 PKGS := $(shell pkg-config --silence-errors --cflags deadbeef 2>/dev/null)
 ifeq ($(strip $(PKGS)),)
     PKGS := $(DDB_INCLUDE)
