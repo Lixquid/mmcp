@@ -8,6 +8,7 @@
 package main
 
 import (
+	"io"
 	"fmt"
 	"net/http"
 	"os"
@@ -101,10 +102,18 @@ func main() {
 
 	// launch the mock provider
 	cmd := exec.Command(providerBin, eventLog)
+	cmdStdin, stdinErr := cmd.StdinPipe()
+	if stdinErr != nil {
+		fmt.Println("FAIL stdin pipe:", stdinErr)
+		os.Exit(1)
+	}
+	_ = stdinErr
 	if err := cmd.Start(); err != nil {
 		fmt.Println("FAIL starting provider:", err)
 		os.Exit(1)
 	}
+	mockStdin = cmdStdin
+	defer mockStdin.Close()
 	defer cmd.Process.Kill()
 	go func() {
 		_ = cmd.Wait()
@@ -144,6 +153,12 @@ func waitFor(what string, timeout time.Duration, pred func() bool) bool {
 	fmt.Printf("FAIL %s (timed out; got %d messages: %q)\n", what, len(providerMsgs), providerMsgs)
 	mu.Unlock()
 	return false
+}
+
+var mockStdin io.WriteCloser
+
+func setEnable(v int) {
+	fmt.Fprintf(mockStdin, "enable %d\n", v)
 }
 
 func runChecks() (pass bool) {
@@ -226,6 +241,26 @@ func runChecks() (pass bool) {
 		return countWithPrefix("1/TRACK") >= 3 // announce + broadcast INFO + targeted INFO
 	})
 	report("targeted INFO answered", ok)
+	pass = pass && ok
+
+	// 3b. disable: the provider must disconnect and never reconnect.
+	// Let any in-flight responses from the INFO stages drain first so the
+	// count is stable.
+	time.Sleep(700 * time.Millisecond)
+	countBefore := countWithPrefix("1/TRACK")
+	setEnable(0)
+	time.Sleep(4 * time.Second)
+	tracksAfterDisable := countWithPrefix("1/TRACK")
+	silent := tracksAfterDisable == countBefore
+	report("disable: no traffic while disabled", silent)
+	pass = pass && silent
+
+	// 3c. re-enable: connection and announce come back
+	setEnable(1)
+	ok = waitFor("re-enable: fresh announce", 10*time.Second, func() bool {
+		return countWithPrefix("1/CAPABILITIES") >= 2 && countWithPrefix("1/TRACK") >= countBefore+1
+	})
+	report("re-enable: provider reconnects and reannounces", ok)
 	pass = pass && ok
 
 	// 4. SEEK: event logged and new position reported

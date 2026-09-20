@@ -100,9 +100,14 @@ packaged zips to a GitHub Release.
 
 ## Configuration
 
-The relay endpoint is configurable in DeaDBeeF's plugin preferences
-(`mmcp.relay`, default `ws://localhost:9994`). Changing it reconnects the
-provider to the new relay.
+Configurable in DeaDBeeF's plugin preferences:
+
+- **Enable MMCP provider** (`mmcp.enable`, on by default). Turning it off
+  fully disconnects from the relay and stops all connection attempts; the
+  provider reconnects when re-enabled — including at startup, where a
+  disabled plugin never touches the relay.
+- **MMCP relay URL** (`mmcp.relay`, default `ws://localhost:9994`).
+  Changing it reconnects the provider to the new relay.
 
 ## Behavior
 

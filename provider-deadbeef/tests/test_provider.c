@@ -147,15 +147,28 @@ mock_mutex_unlock (uintptr_t m) {
     return pthread_mutex_unlock ((pthread_mutex_t *)m);
 }
 
+static volatile int mock_enable = 1; // runtime-mutable mmcp.enable (e2e control)
 static void
 mock_conf_get_str (const char *key, const char *def, char *buffer, int buffer_size) {
-    (void)key;
     (void)def;
+    if (key && strcmp (key, "mmcp.enable") == 0) {
+        snprintf (buffer, buffer_size, "%d", mock_enable);
+        return;
+    }
     // point the provider at the test relay
     snprintf (buffer, buffer_size, "ws://127.0.0.1:9995");
 }
 
 // ---- mock api --------------------------------------------------------------
+
+static int
+mock_conf_get_int (const char *key, int def) {
+    if (key && strcmp (key, "mmcp.enable") == 0) {
+        return mock_enable;
+    }
+    (void)def;
+    return 0;
+}
 
 static DB_output_t mock_output = {
     .state = NULL, // set at runtime
@@ -176,6 +189,7 @@ init_mock_api (void) {
     memset (&api, 0, sizeof (api));
 
     api.conf_get_str = mock_conf_get_str;
+    api.conf_get_int = mock_conf_get_int;
     api.get_output = NULL; // patched below to return a non-NULL output
     api.pl_get_meta = mock_pl_get_meta;
     api.pl_get_item_duration = NULL; // patched below
@@ -248,9 +262,18 @@ main (int argc, char *argv[]) {
     // its threads until then
     p->message (DB_EV_PLUGINSLOADED, 0, 0, 0);
 
-    // run until killed
-    for (;;) {
-        sleep (3600);
+    // run until killed; also accept simple commands on stdin so the e2e can
+    // mutate the mock configuration at runtime:
+    //   enable 0|1   -> set mmcp.enable and deliver DB_EV_CONFIGCHANGED
+    char line[256];
+    while (fgets (line, sizeof (line), stdin)) {
+        int value;
+        if (sscanf (line, "enable %d", &value) == 1) {
+            mock_enable = value ? 1 : 0;
+            p->message (DB_EV_CONFIGCHANGED, 0, 0, 0);
+            printf ("CMD enable=%d\n", mock_enable);
+            fflush (stdout);
+        }
     }
     return 0;
 }

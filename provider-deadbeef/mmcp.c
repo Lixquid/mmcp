@@ -46,6 +46,7 @@
 
 #define DEFAULT_RELAY "ws://localhost:9994"
 #define CONF_RELAY "mmcp.relay"
+#define CONF_ENABLE "mmcp.enable"
 
 #define RECONNECT_MIN_MS 1000
 #define RECONNECT_MAX_MS 15000
@@ -71,6 +72,10 @@ static uintptr_t send_mutex;
 // because the streamer (and its locks) is only initialized after all plugin
 // start() methods have run — touching it earlier crashes the player
 static volatile int threads_started;
+
+// mirrors the mmcp.enable preference at runtime; when 0 the provider is
+// fully disconnected and makes no connection attempts
+static volatile int plugin_enabled;
 
 // set by the event handler when playback state or track info may have changed
 static volatile int track_dirty;
@@ -523,42 +528,34 @@ worker_thread (void *ctx) {
 // plugin lifecycle
 // ----------------------------------------------------------------------------
 
-// Spawns the network and worker threads. Called once, on DB_EV_PLUGINSLOADED.
+// Spawns the network and worker threads. Called on DB_EV_PLUGINSLOADED
+// (or when the user enables the plugin at runtime).
 static void
 start_threads (void) {
     if (threads_started) {
         return;
     }
     threads_started = 1;
+    terminate = 0;
+    track_dirty = 1;
+    last_track_key[0] = '\0';
+    last_pos_time = 0;
+    ws_connected = 0;
 
     send_mutex = deadbeef->mutex_create_nonrecursive ();
     net_tid = deadbeef->thread_start (net_thread, NULL);
     worker_tid = deadbeef->thread_start (worker_thread, NULL);
 }
 
-static int
-mmcp_start (void) {
-    terminate = 0;
-    track_dirty = 1;
+// Fully disconnects and stops the threads; used by both plugin shutdown and
+// runtime disable. After this no connection attempts are made until
+// start_threads () runs again.
+static void
+stop_threads (void) {
+    if (!threads_started) {
+        return;
+    }
     threads_started = 0;
-    last_track_key[0] = '\0';
-    last_pos_time = 0;
-    ws_connected = 0;
-
-    deadbeef->conf_get_str (CONF_RELAY, DEFAULT_RELAY, relay_url, sizeof (relay_url));
-
-    srand ((unsigned)(time (NULL) ^ mmcp_getpid ()));
-    generate_instance_id ();
-    MMCP_TRACE ("starting, instance %s, relay %s\n", instance_id, relay_url);
-
-    // NOTE: threads are deliberately NOT started here. start() runs while
-    // the player is still initializing; the streamer and its locks only
-    // become valid after DB_EV_PLUGINSLOADED.
-    return 0;
-}
-
-static int
-mmcp_stop (void) {
     terminate = 1;
     mmcp_ws_disconnect ();
 
@@ -575,6 +572,37 @@ mmcp_stop (void) {
         send_mutex = 0;
     }
 
+    terminate = 0;
+    ws_connected = 0;
+    track_dirty = 1;
+    last_track_key[0] = '\0';
+    last_pos_time = 0;
+}
+
+static int
+mmcp_start (void) {
+    terminate = 0;
+    threads_started = 0;
+    ws_connected = 0;
+
+    deadbeef->conf_get_str (CONF_RELAY, DEFAULT_RELAY, relay_url, sizeof (relay_url));
+    plugin_enabled = deadbeef->conf_get_int (CONF_ENABLE, 1);
+
+    srand ((unsigned)(time (NULL) ^ mmcp_getpid ()));
+    generate_instance_id ();
+    MMCP_TRACE ("starting, instance %s, relay %s, %s\n", instance_id, relay_url,
+                plugin_enabled ? "enabled" : "DISABLED");
+
+    // NOTE: threads are deliberately NOT started here. start() runs while
+    // the player is still initializing; the streamer and its locks only
+    // become valid after DB_EV_PLUGINSLOADED. The PLUGINSLOADED handler
+    // starts the threads only if the plugin is enabled.
+    return 0;
+}
+
+static int
+mmcp_stop (void) {
+    stop_threads ();
     MMCP_TRACE ("stopped\n");
     return 0;
 }
@@ -589,8 +617,10 @@ mmcp_message (uint32_t id, uintptr_t ctx, uint32_t p1, uint32_t p2) {
     case DB_EV_PLUGINSLOADED:
         // the player is fully initialized (streamer included) — safe to
         // touch it from our threads now
-        start_threads ();
-        track_dirty = 1;
+        if (plugin_enabled) {
+            start_threads ();
+            track_dirty = 1;
+        }
         break;
     case DB_EV_SONGSTARTED:
     case DB_EV_SONGCHANGED:
@@ -603,13 +633,27 @@ mmcp_message (uint32_t id, uintptr_t ctx, uint32_t p1, uint32_t p2) {
         track_dirty = 1;
         break;
     case DB_EV_CONFIGCHANGED: {
-        char url[512];
-        deadbeef->conf_get_str (CONF_RELAY, DEFAULT_RELAY, url, sizeof (url));
-        if (strcmp (url, relay_url) != 0) {
-            snprintf (relay_url, sizeof (relay_url), "%s", url);
-            // drop the current connection; the net thread reconnects to the
-            // new relay
-            mmcp_ws_disconnect ();
+        int enabled = deadbeef->conf_get_int (CONF_ENABLE, 1);
+        if (enabled != plugin_enabled) {
+            plugin_enabled = enabled;
+            if (enabled) {
+                MMCP_TRACE ("enabled; connecting\n");
+                start_threads ();
+            }
+            else {
+                MMCP_TRACE ("disabled; disconnecting\n");
+                stop_threads ();
+            }
+        }
+        if (plugin_enabled) {
+            char url[512];
+            deadbeef->conf_get_str (CONF_RELAY, DEFAULT_RELAY, url, sizeof (url));
+            if (strcmp (url, relay_url) != 0) {
+                snprintf (relay_url, sizeof (relay_url), "%s", url);
+                // drop the current connection; the net thread reconnects to
+                // the new relay
+                mmcp_ws_disconnect ();
+            }
         }
         break;
     }
@@ -621,7 +665,8 @@ mmcp_message (uint32_t id, uintptr_t ctx, uint32_t p1, uint32_t p2) {
 }
 
 static const char settings_dlg[] =
-    "property \"MMCP relay URL\" entry mmcp.relay \"" DEFAULT_RELAY "\";\n";
+    "property \"Enable MMCP provider\" checkbox " CONF_ENABLE " 1;\n"
+    "property \"MMCP relay URL\" entry " CONF_RELAY " \"" DEFAULT_RELAY "\";\n";
 
 static DB_misc_t plugin = {
     DDB_PLUGIN_SET_API_VERSION.plugin.type = DB_PLUGIN_MISC,
