@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -142,11 +143,13 @@ func (u *hubUI) build() fyne.CanvasObject {
 	detailScroll := container.NewVScroll(detail)
 
 	// ---- Provider list -------------------------------------------------
+	// Fyne lists give every row the same height (taken from the template),
+	// so the template must reserve two lines and rows must never wrap.
 	u.list = widget.NewList(
 		func() int { return len(u.listIDs) },
 		func() fyne.CanvasObject {
-			l := widget.NewLabel("template")
-			l.Wrapping = fyne.TextWrapWord
+			l := widget.NewLabel("template\ntemplate")
+			l.Wrapping = fyne.TextWrapOff
 			return l
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
@@ -158,7 +161,7 @@ func (u *hubUI) build() fyne.CanvasObject {
 
 			v, ok := u.state.view(id)
 			if !ok {
-				label.SetText(id)
+				label.SetText(id + "\n")
 				return
 			}
 
@@ -173,7 +176,8 @@ func (u *hubUI) build() fyne.CanvasObject {
 					title += " — " + v.Track.artist
 				}
 			}
-			label.SetText(fmt.Sprintf("%s %s\n%s", state, id, title))
+			// rows are uniform height: never wrap, never exceed two lines
+			label.SetText(fmt.Sprintf("%s %s\n%s", state, id, truncateRunes(title, 48)))
 		},
 	)
 	u.list.OnSelected = func(i widget.ListItemID) {
@@ -559,6 +563,15 @@ func (u *hubUI) fetchArt(url string) image.Image {
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
+
+// truncateRunes shortens s to at most n runes, guaranteeing valid UTF-8.
+func truncateRunes(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	runes := []rune(s)
+	return string(runes[:n])
+}
 
 func formatDuration(seconds float64) string {
 	if seconds < 0 {
