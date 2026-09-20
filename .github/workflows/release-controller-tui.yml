@@ -55,6 +55,7 @@ jobs:
             -o "$GITHUB_WORKSPACE/dist/${{ matrix.binary }}${{ matrix.ext }}" .
 
       - name: Package
+        working-directory: controller-tui
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
