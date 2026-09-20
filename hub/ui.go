@@ -66,6 +66,7 @@ type hubUI struct {
 	// Debug panel.
 	debugGrid *widget.TextGrid
 	debugPane fyne.CanvasObject
+	pauseBtn  *widget.Button
 
 	// Toolbar.
 	statusLabel *widget.Label
@@ -233,8 +234,22 @@ func (u *hubUI) build() fyne.CanvasObject {
 	u.debugGrid = widget.NewTextGrid()
 	debugScroll := container.NewVScroll(u.debugGrid)
 	debugScroll.SetMinSize(fyne.NewSize(0, debugPaneHeight))
-	u.debugPane = container.NewVScroll(u.debugGrid)
-	u.debugPane = debugScroll
+
+	// debug toolbar: clear the recorded list, and pause/resume recording
+	debugToolbar := container.NewHBox(
+		widget.NewLabelWithStyle("Messages", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
+			u.relay.log.Clear()
+		}),
+	)
+
+	u.pauseBtn = widget.NewButtonWithIcon("", theme.MediaPauseIcon(), func() {
+		u.relay.log.SetPaused(!u.relay.log.Paused())
+		u.updateDebugButtons()
+	})
+	debugToolbar.Add(u.pauseBtn)
+
+	u.debugPane = container.NewVBox(debugToolbar, debugScroll)
 
 	// ---- Toolbar -------------------------------------------------------
 	u.statusLabel = widget.NewLabel("")
@@ -304,6 +319,16 @@ func (u *hubUI) focus() (providerView, bool) {
 		return u.state.view(id)
 	}
 	return providerView{}, false
+}
+
+// updateDebugButtons reflects the pause state in the toolbar button: a pause
+// icon while recording, a play (resume) icon while paused.
+func (u *hubUI) updateDebugButtons() {
+	if u.relay.log.Paused() {
+		u.pauseBtn.SetIcon(theme.MediaPlayIcon())
+	} else {
+		u.pauseBtn.SetIcon(theme.MediaPauseIcon())
+	}
 }
 
 // refresh updates every piece of UI from the current state. It must run on

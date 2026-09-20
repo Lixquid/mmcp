@@ -21,6 +21,7 @@ type MessageLog struct {
 	mu       sync.Mutex
 	lines    []string
 	maxLines int
+	paused   bool
 	onChange func()
 }
 
@@ -36,9 +37,42 @@ func (l *MessageLog) SetOnChange(cb func()) {
 	l.mu.Unlock()
 }
 
+// SetPaused pauses or resumes recording. While paused, Add drops messages
+// without recording them (and without firing the change callback). The
+// already-recorded history is kept and shown again on resume.
+func (l *MessageLog) SetPaused(paused bool) {
+	l.mu.Lock()
+	l.paused = paused
+	l.mu.Unlock()
+}
+
+// Paused reports whether recording is currently paused.
+func (l *MessageLog) Paused() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.paused
+}
+
+// Clear removes all recorded messages.
+func (l *MessageLog) Clear() {
+	l.mu.Lock()
+	l.lines = nil
+	cb := l.onChange
+	l.mu.Unlock()
+
+	if cb != nil {
+		cb()
+	}
+}
+
 // Add records a message that passed through the relay.
 func (l *MessageLog) Add(source string, data []byte) {
 	l.mu.Lock()
+
+	if l.paused {
+		l.mu.Unlock()
+		return
+	}
 
 	ts := time.Now().Format("15:04:05.000")
 	l.lines = append(l.lines,
