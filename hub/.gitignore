@@ -1,5 +1,6 @@
 dist/
 build/appimagetool*
+build/squashfs-root/
 AppDir
 MMCP-Hub.AppDir
 hub

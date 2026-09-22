@@ -64,9 +64,10 @@ type hubUI struct {
 	dragging bool
 
 	// Debug panel.
-	debugGrid *widget.TextGrid
-	debugPane fyne.CanvasObject
-	pauseBtn  *widget.Button
+	debugGrid   *widget.TextGrid
+	debugScroll *container.Scroll
+	debugPane   fyne.CanvasObject
+	pauseBtn    *widget.Button
 
 	// Toolbar.
 	statusLabel *widget.Label
@@ -232,14 +233,15 @@ func (u *hubUI) build() fyne.CanvasObject {
 
 	// ---- Debug panel ---------------------------------------------------
 	u.debugGrid = widget.NewTextGrid()
-	debugScroll := container.NewVScroll(u.debugGrid)
-	debugScroll.SetMinSize(fyne.NewSize(0, debugPaneHeight))
+	u.debugScroll = container.NewVScroll(u.debugGrid)
+	u.debugScroll.SetMinSize(fyne.NewSize(0, debugPaneHeight))
 
 	// debug toolbar: clear the recorded list, and pause/resume recording
 	debugToolbar := container.NewHBox(
 		widget.NewLabelWithStyle("Messages", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
 			u.relay.log.Clear()
+			u.resetDebugGrid()
 		}),
 	)
 
@@ -249,7 +251,7 @@ func (u *hubUI) build() fyne.CanvasObject {
 	})
 	debugToolbar.Add(u.pauseBtn)
 
-	u.debugPane = container.NewVBox(debugToolbar, debugScroll)
+	u.debugPane = container.NewVBox(debugToolbar, u.debugScroll)
 
 	// ---- Toolbar -------------------------------------------------------
 	u.statusLabel = widget.NewLabel("")
@@ -299,7 +301,7 @@ func (u *hubUI) build() fyne.CanvasObject {
 	u.relay.log.SetOnChange(func() {
 		fyne.Do(func() {
 			u.debugGrid.SetText(u.relay.log.Text())
-			debugScroll.ScrollToBottom()
+			u.debugScroll.ScrollToBottom()
 		})
 	})
 
@@ -319,6 +321,16 @@ func (u *hubUI) focus() (providerView, bool) {
 		return u.state.view(id)
 	}
 	return providerView{}, false
+}
+
+// resetDebugGrid swaps in a fresh TextGrid. Fyne 2.6.1's TextGrid keeps stale
+// rendered rows when the buffer shrinks (pooled row renderers early-return
+// without clearing their cells), so SetText("") alone would leave old
+// messages visible until overwritten. Replacing the widget avoids that.
+func (u *hubUI) resetDebugGrid() {
+	u.debugGrid = widget.NewTextGrid()
+	u.debugScroll.Content = u.debugGrid
+	u.debugScroll.Refresh()
 }
 
 // updateDebugButtons reflects the pause state in the toolbar button: a pause
