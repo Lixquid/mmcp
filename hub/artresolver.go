@@ -42,13 +42,14 @@ const (
 	// negativeTTL is how long a "not found" result is remembered before
 	// the lookup is retried. Positive results are cached forever.
 	negativeTTL = 7 * 24 * time.Hour
-
-	// userAgent identifies the hub to MusicBrainz, per their usage policy.
-	userAgent = "MMCP-Hub/1.0 (https://github.com/mmcp/mmcp)"
 )
 
 // mbidPattern matches a MusicBrainz UUID.
 var mbidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// userAgent identifies the hub to MusicBrainz, per their usage policy. It
+// includes the embedded application version.
+var userAgent = "MMCP-Hub/" + appVersion() + " (https://github.com/mmcp/mmcp)"
 
 // artEntry is one cached resolver result, stored as JSON on disk.
 type artEntry struct {

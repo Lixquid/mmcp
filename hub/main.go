@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 
 	_ "embed"
@@ -17,7 +18,13 @@ var iconData []byte
 
 func main() {
 	port := flag.Int("port", defaultRelayPort, "TCP port for the MMCP relay")
+	showVersion := flag.Bool("version", false, "print the embedded version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(appVersion())
+		return
+	}
 
 	a := app.NewWithID("io.mmcp.hub")
 	a.SetIcon(&fyne.StaticResource{

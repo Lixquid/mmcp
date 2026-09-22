@@ -13,19 +13,30 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP="MMCP-Hub"
-VERSION="${VERSION:-1.0.0}"
 DIST="dist"
 APPDIR="$APP.AppDir"
+
+# Compute the embedded application version: the hub/ tag naming HEAD when
+# present (prefix stripped), otherwise the short commit ID; "-dirty" is
+# appended when there are uncommitted changes under the hub folder.
+HUB_VER="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
+if git_tag="$(git tag --points-at HEAD 2>/dev/null | grep -E '^hub/v' | head -1)" && [ -n "$git_tag" ]; then
+	HUB_VER="${git_tag#hub/}"
+fi
+if [ -n "$(git status --porcelain -- . 2>/dev/null)" ]; then
+	HUB_VER="${HUB_VER}-dirty"
+fi
+echo "==> Embedding version: $HUB_VER"
 
 rm -rf "$DIST" "$APPDIR"
 mkdir -p "$DIST" "$APPDIR/usr/bin"
 
 echo "==> Building Linux binary (for AppImage)"
-go build -trimpath -ldflags "-s -w" -o "$APPDIR/usr/bin/hub" .
+go build -trimpath -ldflags "-s -w -X main.version=$HUB_VER" -o "$APPDIR/usr/bin/hub" .
 
 echo "==> Building Windows exe"
 CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc \
-	go build -trimpath -ldflags "-H=windowsgui -s -w" \
+	go build -trimpath -ldflags "-H=windowsgui -s -w -X main.version=$HUB_VER" \
 	-o "$DIST/$APP-windows-amd64.exe" .
 
 echo "==> Assembling AppDir"
