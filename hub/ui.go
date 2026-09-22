@@ -272,8 +272,12 @@ func (u *hubUI) build() fyne.CanvasObject {
 		} else {
 			u.debugPane.Hide()
 		}
-		// Show/Hide does not re-layout the ancestors; force it.
-		u.root.Refresh()
+		// Show/Hide does not re-layout the ancestors; force it. u.root
+		// is still nil while build() is assembling the UI (the initial
+		// SetChecked below fires this callback), so guard the refresh.
+		if u.root != nil {
+			u.root.Refresh()
+		}
 	})
 	debugCheck.SetChecked(false)
 	u.debugPane.Hide()
@@ -356,6 +360,7 @@ func (u *hubUI) build() fyne.CanvasObject {
 	u.tipText = tipText
 	u.tipBox = tipBox
 	root = container.NewStack(root, tipOverlay)
+	u.root = root
 
 	// Wire UI-facing callbacks from the relay and the message log.
 	u.relay.SetOnUpdate(func() {
