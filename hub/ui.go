@@ -74,16 +74,18 @@ type hubUI struct {
 
 	// Artwork fetching.
 	artMu      sync.Mutex
+	art        *ArtResolver
 	artShown   string
 	artCache   map[string]image.Image
 	artPending map[string]bool
 }
 
-func newHubUI(window fyne.Window, relay *Relay) *hubUI {
+func newHubUI(window fyne.Window, relay *Relay, art *ArtResolver) *hubUI {
 	return &hubUI{
 		window:     window,
 		relay:      relay,
 		state:      newControllerState(),
+		art:        art,
 		artCache:   make(map[string]image.Image),
 		artPending: make(map[string]bool),
 	}
@@ -268,6 +270,16 @@ func (u *hubUI) build() fyne.CanvasObject {
 	debugCheck.SetChecked(false)
 	u.debugPane.Hide()
 
+	// Album-art lookup via MusicBrainz / Cover Art Archive. The choice
+	// persists across runs via the app's preferences.
+	prefs := fyne.CurrentApp().Preferences()
+	artCheck := widget.NewCheck("MusicBrainz artwork", func(on bool) {
+		prefs.SetBool("artResolverEnabled", on)
+		u.art.SetEnabled(on)
+	})
+	artCheck.SetChecked(prefs.BoolWithFallback("artResolverEnabled", true))
+	artCheck.OnChanged(artCheck.Checked)
+
 	discoverBtn := widget.NewButton("Discover", func() {
 		if data, ok := encodeControl(broadcastID, "INFO"); ok {
 			u.relay.SendFromLocal(data)
@@ -279,6 +291,7 @@ func (u *hubUI) build() fyne.CanvasObject {
 			widget.NewLabelWithStyle("MMCP Hub", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 			discoverBtn,
 			debugCheck,
+			artCheck,
 		),
 		nil,
 		container.NewHBox(layout.NewSpacer(), u.statusLabel),

@@ -30,7 +30,10 @@ func main() {
 	msgLog := newMessageLog(maxLogLines)
 	relay := newRelay(*port, msgLog)
 
-	ui := newHubUI(window, relay)
+	art := newArtResolver(relay)
+	relay.SetOnMessage(art.HandleMessage)
+
+	ui := newHubUI(window, relay, art)
 
 	if err := relay.Start(); err != nil {
 		log.Fatal(err)
@@ -38,6 +41,14 @@ func main() {
 
 	// The hub UI acts as a controller connected to its own relay.
 	relay.AttachLocal(ui.deliver)
+
+	// Resolved artwork is broadcast through the relay as TRACK.ART; the
+	// hub's own controller view must also see it (the relay does not
+	// deliver local messages back to the sender).
+	art.SetSend(func(data []byte) {
+		relay.SendFromLocal(data)
+		ui.deliver(data)
+	})
 
 	// Discover providers that are already connected.
 	if data, ok := encodeControl(broadcastID, "INFO"); ok {

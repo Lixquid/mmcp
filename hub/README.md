@@ -13,7 +13,17 @@ built with Go and the [Fyne](https://fyne.io) toolkit. It combines:
   bottom, each disabled when the focused provider does not advertise the
   corresponding capability (`NEXT`, `PREV`, `SEEK`; play/pause needs none);
 - **a toggleable debug panel** ("Debug messages" checkbox) showing every
-  message that passes through the relay, with timestamps and source.
+  message that passes through the relay, with timestamps and source;
+- **asynchronous album-art lookup** ("MusicBrainz artwork" checkbox, on by
+  default) — when a provider announces a `TRACK` with an empty art argument,
+  the hub queries MusicBrainz for the release group matching the track's
+  artist and album, then broadcasts a `TRACK.ART` message (the Asynchronous
+  Album Art extension, SPEC.md 5.1) pointing at the Cover Art Archive
+  `front-500` cover. Results are cached on disk (keyed by normalized
+  artist+album, so repeat tracks never re-query), "not found" results are
+  remembered for 7 days, MusicBrainz's one-request-per-second limit is
+  respected, and providers that already supply art are left untouched. Lookups
+  can be disabled with the toolbar checkbox; the choice persists.
 
 ## Downloading a release
 
@@ -85,4 +95,5 @@ Produces in `dist/`:
 | `relay.go`   | Stateless WebSocket relay, message log, local UI client     |
 | `protocol.go`| MMCP message parsing/encoding                               |
 | `state.go`   | Derived provider state (TRACK / POS / CAPABILITIES)         |
+| `artresolver.go` | MusicBrainz album-art lookup (Asynchronous Album Art)   |
 | `ui.go`      | Fyne UI: list, detail panel, controls, debug feed, artwork  |

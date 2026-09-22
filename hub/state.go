@@ -74,6 +74,8 @@ func (s *controllerState) handle(msg message) {
 		s.applyPos(msg.args)
 	case msgTypeCapabilities:
 		s.applyCapabilities(msg.args)
+	case msgTypeTrackArt:
+		s.applyTrackArt(msg.args)
 	}
 }
 
@@ -106,6 +108,23 @@ func (s *controllerState) applyTrack(args []string) {
 	} else if s.playing == id {
 		s.playing = ""
 	}
+}
+
+// applyTrackArt handles a valid 1/TRACK.ART message (Asynchronous Album Art
+// extension). It updates the album art of the provider's current track. It
+// does not establish or change playback state or track identity: if the
+// provider has no current track the message is ignored.
+func (s *controllerState) applyTrackArt(args []string) {
+	id := args[0]
+	if !validInstanceID(id) {
+		return
+	}
+
+	p, ok := s.providers[id]
+	if !ok || p.track == nil {
+		return
+	}
+	p.track.art = args[1]
 }
 
 // applyPos handles a valid 1/POS message. It only records position

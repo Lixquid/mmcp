@@ -132,6 +132,7 @@ type Relay struct {
 	clients  map[*client]struct{}
 	local    *client
 	onUpdate func()
+	onMsg    func([]byte)
 }
 
 func newRelay(port int, log *MessageLog) *Relay {
@@ -147,6 +148,15 @@ func newRelay(port int, log *MessageLog) *Relay {
 func (r *Relay) SetOnUpdate(cb func()) {
 	r.mu.Lock()
 	r.onUpdate = cb
+	r.mu.Unlock()
+}
+
+// SetOnMessage installs a callback fired for every message that passes
+// through the relay, including messages injected by the hub itself. It is
+// called from arbitrary goroutines and must not block.
+func (r *Relay) SetOnMessage(cb func([]byte)) {
+	r.mu.Lock()
+	r.onMsg = cb
 	r.mu.Unlock()
 }
 
@@ -253,6 +263,7 @@ func (r *Relay) broadcast(msg []byte, from *client) {
 	r.log.Add(sourceOf(from), msg)
 
 	r.mu.Lock()
+	onMsg := r.onMsg
 	targets := make([]*client, 0, len(r.clients))
 	for c := range r.clients {
 		if c == from {
@@ -274,6 +285,10 @@ func (r *Relay) broadcast(msg []byte, from *client) {
 		default:
 			// Client cannot keep up: drop rather than block the relay.
 		}
+	}
+
+	if onMsg != nil {
+		onMsg(msg)
 	}
 }
 

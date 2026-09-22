@@ -10,6 +10,7 @@ import (
 // Version 1 message types. The version prefix is part of the type.
 const (
 	msgTypeTrack        = "1/TRACK"
+	msgTypeTrackArt     = "1/TRACK.ART"
 	msgTypePos          = "1/POS"
 	msgTypeCapabilities = "1/CAPABILITIES"
 	msgTypeControl      = "1/CONTROL"
@@ -46,6 +47,11 @@ func parseMessage(data []byte) (message, bool) {
 		if len(fields) != 8 {
 			return message{}, false
 		}
+	case msgTypeTrackArt:
+		// id, art (art may be empty)
+		if len(fields) != 3 {
+			return message{}, false
+		}
 	case msgTypePos:
 		// id, position, length (length may be empty)
 		if len(fields) != 4 {
@@ -78,6 +84,17 @@ func encodeControl(id, command string, args ...string) ([]byte, bool) {
 		}
 	}
 	return []byte(strings.Join(fields, string(rsByte))), true
+}
+
+// encodeTrackArt encodes a TRACK.ART message (Asynchronous Album Art
+// extension). It fails if any field would contain RS.
+func encodeTrackArt(id, art string) ([]byte, bool) {
+	for _, field := range []string{id, art} {
+		if strings.ContainsRune(field, rsByte) {
+			return nil, false
+		}
+	}
+	return []byte(strings.Join([]string{msgTypeTrackArt, id, art}, string(rsByte))), true
 }
 
 // validInstanceID reports whether id is exactly eight ASCII alphanumeric
