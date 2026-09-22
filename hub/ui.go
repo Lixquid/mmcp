@@ -38,6 +38,10 @@ type hubUI struct {
 	state  *controllerState
 	root   fyne.CanvasObject
 
+	// Shared tooltip overlay (see tooltip.go).
+	tipText *canvas.Text
+	tipBox  *fyne.Container
+
 	// Provider list.
 	list    *widget.List
 	listIDs []string
@@ -75,17 +79,19 @@ type hubUI struct {
 	// Artwork fetching.
 	artMu      sync.Mutex
 	art        *ArtResolver
+	mpris      *mprisSim
 	artShown   string
 	artCache   map[string]image.Image
 	artPending map[string]bool
 }
 
-func newHubUI(window fyne.Window, relay *Relay, art *ArtResolver) *hubUI {
+func newHubUI(window fyne.Window, relay *Relay, art *ArtResolver, mpris *mprisSim) *hubUI {
 	return &hubUI{
 		window:     window,
 		relay:      relay,
 		state:      newControllerState(),
 		art:        art,
+		mpris:      mpris,
 		artCache:   make(map[string]image.Image),
 		artPending: make(map[string]bool),
 	}
@@ -280,6 +286,27 @@ func (u *hubUI) build() fyne.CanvasObject {
 	artCheck.SetChecked(prefs.BoolWithFallback("artResolverEnabled", true))
 	artCheck.OnChanged(artCheck.Checked)
 
+	// Simulated MPRIS provider. The choice persists across runs; on
+	// Windows there is no D-Bus support, so the checkbox is not shown at
+	// all.
+	toolbarChecks := []fyne.CanvasObject{}
+	if mprisSupported() {
+		mprisCheck := widget.NewCheck("MPRIS provider", func(on bool) {
+			prefs.SetBool("mprisEnabled", on)
+			if on {
+				u.mpris.Start()
+			} else {
+				u.mpris.Stop()
+			}
+		})
+		mprisOn := prefs.BoolWithFallback("mprisEnabled", false)
+		mprisCheck.SetChecked(mprisOn)
+		if mprisOn {
+			u.mpris.Start()
+		}
+		toolbarChecks = append(toolbarChecks, mprisCheck)
+	}
+
 	discoverBtn := widget.NewButton("Discover", func() {
 		if data, ok := encodeControl(broadcastID, "INFO"); ok {
 			u.relay.SendFromLocal(data)
@@ -287,12 +314,12 @@ func (u *hubUI) build() fyne.CanvasObject {
 	})
 
 	toolbar := container.NewBorder(nil, nil,
-		container.NewHBox(
+		container.NewHBox(append([]fyne.CanvasObject{
 			widget.NewLabelWithStyle("MMCP Hub", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 			discoverBtn,
 			debugCheck,
 			artCheck,
-		),
+		}, toolbarChecks...)...),
 		nil,
 		container.NewHBox(layout.NewSpacer(), u.statusLabel),
 	)
@@ -302,7 +329,11 @@ func (u *hubUI) build() fyne.CanvasObject {
 	center.Offset = 0.32
 
 	root := container.NewBorder(toolbar, container.NewVBox(controls, u.debugPane), nil, nil, center)
-	u.root = root
+	// Hover tooltip overlay floats above everything and is never laid out.
+	tipOverlay, tipText, tipBox := buildTipOverlay()
+	u.tipText = tipText
+	u.tipBox = tipBox
+	root = container.NewStack(root, tipOverlay)
 
 	// Wire UI-facing callbacks from the relay and the message log.
 	u.relay.SetOnUpdate(func() {

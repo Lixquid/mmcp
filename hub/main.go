@@ -40,7 +40,8 @@ func main() {
 	art := newArtResolver(relay)
 	relay.SetOnMessage(art.HandleMessage)
 
-	ui := newHubUI(window, relay, art)
+	mpris := newMPRISSim(relay)
+	ui := newHubUI(window, relay, art, mpris)
 
 	if err := relay.Start(); err != nil {
 		log.Fatal(err)

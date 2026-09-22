@@ -24,6 +24,14 @@ built with Go and the [Fyne](https://fyne.io) toolkit. It combines:
   remembered for 7 days, MusicBrainz's one-request-per-second limit is
   respected, and providers that already supply art are left untouched. Lookups
   can be disabled with the toolbar checkbox; the choice persists.
+- **a simulated MPRIS provider** ("MPRIS provider" checkbox, off by default;
+  not available on Windows) — every media player on the system MPRIS D-Bus
+  interface appears as its own MMCP provider (source derived from the player
+  name, e.g. `VLC`), announcing `PLAY`/`PAUSE`/`NEXT`/`PREV`/`SEEK` and
+  streaming TRACK/POS from the players' live state. `CONTROL` commands are
+  performed on the underlying players. Album art is deliberately not
+  advertised: MPRIS artwork is a local file URI, not globally accessible
+  (the MusicBrainz resolver above fills art in for it anyway).
 
 ## Downloading a release
 
@@ -96,4 +104,5 @@ Produces in `dist/`:
 | `protocol.go`| MMCP message parsing/encoding                               |
 | `state.go`   | Derived provider state (TRACK / POS / CAPABILITIES)         |
 | `artresolver.go` | MusicBrainz album-art lookup (Asynchronous Album Art)   |
+| `mpris.go`   | Simulated provider backed by system MPRIS players (not on Windows) |
 | `ui.go`      | Fyne UI: list, detail panel, controls, debug feed, artwork  |
