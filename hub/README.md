@@ -32,6 +32,14 @@ built with Go and the [Fyne](https://fyne.io) toolkit. It combines:
   performed on the underlying players. Album art is deliberately not
   advertised: MPRIS artwork is a local file URI, not globally accessible
   (the MusicBrainz resolver above fills art in for it anyway).
+- **a simulated SMTC provider** ("SMTC provider" checkbox, off by default;
+  only shown on Windows) — the Windows counterpart of the MPRIS provider.
+  Every System Media Transport Controls session appears as its own MMCP
+  provider (source derived from the app id, e.g. `SPOTIFY`), with the same
+  capabilities, TRACK/POS streaming, and CONTROL execution — and likewise no
+  ART capability, since SMTC artwork is a local thumbnail, not a URL. It is
+  implemented with an embedded PowerShell helper that talks to the WinRT
+  `Windows.Media.Control` API and is respawned automatically if it dies.
 
 ## Downloading a release
 
@@ -95,6 +103,20 @@ Produces in `dist/`:
 - `MMCP-Hub-x86_64.AppImage` — Linux AppImage (requires `appimagetool`;
   downloaded automatically to `build/` on first use)
 
+### Building in a container
+
+Without the toolchain on the host, use the container build from the
+repository root (mounts `./hub` at `/src`, so artifacts appear in
+`hub/dist/` on the host):
+
+```sh
+docker compose -f compose.build.yml build
+docker compose -f compose.build.yml run --rm hub-build
+```
+
+The `.git` folder is bind-mounted read-only so the embedded version string
+is accurate; without it the version falls back to `dev`.
+
 ## Files
 
 | File         | Purpose                                                     |
@@ -105,4 +127,5 @@ Produces in `dist/`:
 | `state.go`   | Derived provider state (TRACK / POS / CAPABILITIES)         |
 | `artresolver.go` | MusicBrainz album-art lookup (Asynchronous Album Art)   |
 | `mpris.go`   | Simulated provider backed by system MPRIS players (not on Windows) |
+| `smtc.go`    | Simulated provider core backed by Windows SMTC sessions (platform neutral core; PowerShell backend in `smtc_windows.go`, stub in `smtc_other.go`) |
 | `ui.go`      | Fyne UI: list, detail panel, controls, debug feed, artwork  |

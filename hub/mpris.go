@@ -15,9 +15,7 @@ package main
 // argument is always empty.
 
 import (
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"strconv"
 	"strings"
 	"sync"
@@ -361,22 +359,6 @@ func (s *mprisSim) instanceID(suffix string) string {
 	id := randomInstanceID()
 	s.ids[suffix] = id
 	return id
-}
-
-// randomInstanceID returns 8 random lowercase alphanumeric characters.
-func randomInstanceID() string {
-	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, 8)
-	n := big.NewInt(int64(len(chars)))
-	for i := range b {
-		v, err := rand.Int(rand.Reader, n)
-		if err != nil {
-			b[i] = 'm'
-			continue
-		}
-		b[i] = chars[v.Int64()]
-	}
-	return string(b)
 }
 
 // ensureConn dials the relay if not connected. It reports whether a usable

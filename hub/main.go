@@ -41,7 +41,8 @@ func main() {
 	relay.SetOnMessage(art.HandleMessage)
 
 	mpris := newMPRISSim(relay)
-	ui := newHubUI(window, relay, art, mpris)
+	smtc := newSMTCSim(relay)
+	ui := newHubUI(window, relay, art, mpris, smtc)
 
 	if err := relay.Start(); err != nil {
 		log.Fatal(err)

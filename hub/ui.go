@@ -80,18 +80,20 @@ type hubUI struct {
 	artMu      sync.Mutex
 	art        *ArtResolver
 	mpris      *mprisSim
+	smtc       *smtcSim
 	artShown   string
 	artCache   map[string]image.Image
 	artPending map[string]bool
 }
 
-func newHubUI(window fyne.Window, relay *Relay, art *ArtResolver, mpris *mprisSim) *hubUI {
+func newHubUI(window fyne.Window, relay *Relay, art *ArtResolver, mpris *mprisSim, smtc *smtcSim) *hubUI {
 	return &hubUI{
 		window:     window,
 		relay:      relay,
 		state:      newControllerState(),
 		art:        art,
 		mpris:      mpris,
+		smtc:       smtc,
 		artCache:   make(map[string]image.Image),
 		artPending: make(map[string]bool),
 	}
@@ -305,6 +307,26 @@ func (u *hubUI) build() fyne.CanvasObject {
 			u.mpris.Start()
 		}
 		toolbarChecks = append(toolbarChecks, mprisCheck)
+	}
+
+	// Simulated SMTC provider, the Windows counterpart of the MPRIS
+	// provider above (Windows System Media Transport Controls). Hidden
+	// on non-Windows builds.
+	if smtcSupported() {
+		smtcCheck := widget.NewCheck("SMTC provider", func(on bool) {
+			prefs.SetBool("smtcEnabled", on)
+			if on {
+				u.smtc.Start()
+			} else {
+				u.smtc.Stop()
+			}
+		})
+		smtcOn := prefs.BoolWithFallback("smtcEnabled", false)
+		smtcCheck.SetChecked(smtcOn)
+		if smtcOn {
+			u.smtc.Start()
+		}
+		toolbarChecks = append(toolbarChecks, smtcCheck)
 	}
 
 	discoverBtn := widget.NewButton("Discover", func() {

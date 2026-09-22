@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -95,6 +97,23 @@ func encodeTrackArt(id, art string) ([]byte, bool) {
 		}
 	}
 	return []byte(strings.Join([]string{msgTypeTrackArt, id, art}, string(rsByte))), true
+}
+
+// randomInstanceID returns 8 random lowercase alphanumeric characters.
+// It is shared by the built-in simulated providers (MPRIS, SMTC).
+func randomInstanceID() string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 8)
+	n := big.NewInt(int64(len(chars)))
+	for i := range b {
+		v, err := rand.Int(rand.Reader, n)
+		if err != nil {
+			b[i] = 'm'
+			continue
+		}
+		b[i] = chars[v.Int64()]
+	}
+	return string(b)
 }
 
 // validInstanceID reports whether id is exactly eight ASCII alphanumeric
