@@ -12,6 +12,9 @@ built with Go and the [Fyne](https://fyne.io) toolkit. It combines:
 - **media controls** — play/pause, next, previous, and a seek bar at the
   bottom, each disabled when the focused provider does not advertise the
   corresponding capability (`NEXT`, `PREV`, `SEEK`; play/pause needs none);
+- **system-tray minimization** — closing the window hides it to the system
+  tray (the relay and all providers keep running); the tray menu offers
+  "Show hub" to restore the window and "Quit" to exit;
 - **a toggleable debug panel** ("Debug messages" checkbox) showing every
   message that passes through the relay, with timestamps and source;
 - **asynchronous album-art lookup** ("MusicBrainz artwork" checkbox, on by
@@ -129,3 +132,4 @@ is accurate; without it the version falls back to `dev`.
 | `mpris.go`   | Simulated provider backed by system MPRIS players (not on Windows) |
 | `smtc.go`    | Simulated provider core backed by Windows SMTC sessions (platform neutral core; PowerShell backend in `smtc_windows.go`, stub in `smtc_other.go`) |
 | `ui.go`      | Fyne UI: list, detail panel, controls, debug feed, artwork  |
+| `tray.go`    | System-tray menu and "minimize to tray" close handling      |

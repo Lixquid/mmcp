@@ -69,5 +69,7 @@ func main() {
 
 	ui.start()
 
+	setupTray(a, window)
+
 	window.ShowAndRun()
 }
